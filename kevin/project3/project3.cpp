@@ -47,7 +47,10 @@ int main()
   size_t NOcc = NElec / 2;
   size_t NBasis = 7;
   size_t M = idx4(NBasis, NBasis, NBasis, NBasis);
-  size_t Nnuc;
+  size_t Nnuc ;
+//  int Nnuc;
+//  long unsigned Nnuc;
+//  unsigned Nnuc;
   size_t i, j, k, l;
   double val, qi, xi, yi, zi;
   size_t mu, nu, lam, sig;
@@ -61,23 +64,17 @@ int main()
   printf("Nuclear repulsion energy =  %12f\n", Vnn);
 
   Geom_file = fopen("h2o_sto3g_geom.dat", "r");
-  fscanf(Geom_file,"%d", &Nnuc);
-  printf("Number of nuclei = %d\n", Nnuc);
+  fscanf(Geom_file,"%zu", &Nnuc);
+  printf("Number of nuclei = %u\n", Nnuc);
   arma::mat Geom(Nnuc, 4);
-
   for (i = 0; i < Nnuc; i++) {
     fscanf(Geom_file, "%lf %lf %lf %lf", &qi, &xi, &yi, &zi);
-    //Geom.row(i) = j, xi, yi, zi;
-    // printf("%d %f %f %f %f\n", i, qi, xi, yi, zi);
     Geom(i,0) = qi;
     Geom(i,1) = xi;
     Geom(i,2) = yi;
     Geom(i,3) = zi;
   }
-  // printf("done reading geom\n");
   fclose(Geom_file);
-  // printf("file closed\n");
-  // Geom.print("Geom:");
   printf("geometry\n");
   print_arma_mat(Geom);
 
@@ -144,7 +141,7 @@ int main()
 
   H = T + V;
 
-  double thresh_E = 1.0e-15;
+  double thresh_E = 1.0e-10;
   double thresh_D = 1.0e-7;
   size_t iteration = 1;
   size_t max_iterations = 1024;
@@ -175,6 +172,8 @@ int main()
   print_arma_mat(H);
   printf("S^-1/2 Matrix:\n");
   print_arma_mat(symm_orthog);
+  printf("Initial Fock Matrix:\n");
+  print_arma_mat(F);
   printf("Initial F' Matrix:\n");
   print_arma_mat(F_prime);
   printf("Initial C Matrix:\n");
@@ -187,10 +186,6 @@ int main()
     E_elec_old = E_elec_new;
     D_old = D_new;
     build_fock(F, D_old, H, ERI);
-    if(iteration==1){
-      printf("Initial Fock Matrix:\n");
-      print_arma_mat(F);
-    }
     trans_fock_to_prime(F_prime, F, symm_orthog);
     arma::eig_sym(eps_vec, C_prime, F_prime);
     trans_C_from_prime(C, C_prime, symm_orthog);
