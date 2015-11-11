@@ -56,77 +56,13 @@ void mix_density(arma::mat& P_new, arma::mat& P_old, double alpha) {
   P_new = ((1.0 - alpha) * P_new) + (alpha * P_old);
 }
 
-void trans_ERI2(arma::vec& ERI_in, arma::vec& ERI_out, arma::mat& C) {
-  int nbas = C.n_rows;
-  for (int p = 0; p < nbas; p++){
-    for (int q = 0; q <= p; q++){
-      for (int r = 0; r <= p; r++){
-        for (int s = 0; s <=r && (!(p==r) || s <=q); s++){
-          for (int i = 0; i < nbas; i++){
-            for (int j = 0; j < nbas; j++){
-              for (int k = 0; k < nbas; k++){
-                for (int l = 0; l < nbas; l++){
-                  ERI_out(idx4(p,q,r,s)) += C(i,p) * C(j,q) * C(k,r) * C(l,s) * ERI_in(idx4(i,j,k,l));
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-}
-void trans_ERI3(arma::vec& ERI_in, arma::vec& ERI_out, arma::mat& C) {
-  int nbas = C.n_rows;
-  arma::vec temp1(nbas);
-  arma::mat temp2(nbas,nbas);
-  arma::cube temp3(nbas,nbas,nbas);
-
-  //for (int p = 0; p < nbas+1; p++){
-  for (int p = 0; p < nbas; p++){
-    temp3.zeros();
-    for (int i = 0; i < nbas; i++){
-      for (int j = 0; j < nbas; j++){
-        for (int k = 0; k < nbas; k++){
-          for (int l = 0; l < nbas; l++){
-            temp3(j,k,l) += C(i,p) * ERI_in(idx4(i,j,k,l));
-            // still need to exploit kl symmetry
-          }
-        }
-      }
-    }
-    for (int q = 0; q <= p; q++){
-      temp2.zeros();
-      for (int j = 0; j < nbas; j++){
-        for (int k = 0; k < nbas; k++){
-          for (int l = 0; l < nbas; l++){
-            temp2(k,l) += C(j,q) * temp3(j,k,l);
-          }
-        }
-      }
-      for (int r = 0; r <= p; r++){
-        temp1.zeros();
-        for (int k = 0; k < nbas; k++){
-          for (int l = 0; l < nbas; l++){
-            temp1(l) += C(k,r) * temp2(k,l);
-          }
-        }
-        for (int s = 0; s <=r && (!(p==r) || s <=q); s++){
-          ERI_out(idx4(p,q,r,s)) = dot(C.col(s), temp1);
-  //        printf("%5d %4d %4d %4d %4d %4d %4d\n",idx4(p,q,r,s),idx2(p,q),idx2(r,s),p,q,r,s);
-        }
-      }
-    }
-  }
-//  printf("%d\n",nbas);
-}
+// TODO: compare efficiency of the three transformations below
 void trans_ERI(arma::vec& ERI_in, arma::vec& ERI_out, arma::mat& C) {
   int nbas = C.n_rows;
   arma::vec temp1(nbas);
   arma::mat temp2(nbas,nbas);
   arma::cube temp3(nbas,nbas,nbas);
 
-  //for (int p = 0; p < nbas+1; p++){
   for (int p = 0; p < nbas; p++){
     temp3.zeros();
     for (int i = 0; i < nbas; i++){
@@ -134,7 +70,6 @@ void trans_ERI(arma::vec& ERI_in, arma::vec& ERI_out, arma::mat& C) {
         for (int k = 0; k < nbas; k++){
           for (int l = 0; l <= k; l++){
             temp3(j,k,l) += C(i,p) * ERI_in(idx4(i,j,k,l));
-            // still need to exploit kl symmetry
           }
         }
       }
@@ -148,11 +83,7 @@ void trans_ERI(arma::vec& ERI_in, arma::vec& ERI_out, arma::mat& C) {
           }
         }
       }
-      printf("before trans\n");
-      print_arma_mat(temp2);
       temp2=symmatl(temp2);
-      printf("after trans\n");
-      print_arma_mat(temp2);
       for (int r = 0; r <= p; r++){
         temp1.zeros();
         for (int k = 0; k < nbas; k++){
@@ -162,12 +93,73 @@ void trans_ERI(arma::vec& ERI_in, arma::vec& ERI_out, arma::mat& C) {
         }
         for (int s = 0; s <=r && (!(p==r) || s <=q); s++){
           ERI_out(idx4(p,q,r,s)) = dot(C.col(s), temp1);
-  //        printf("%5d %4d %4d %4d %4d %4d %4d\n",idx4(p,q,r,s),idx2(p,q),idx2(r,s),p,q,r,s);
         }
       }
     }
   }
-//  printf("%d\n",nbas);
+}
+
+void trans_ERI2(arma::vec& ERI_in, arma::vec& ERI_out, arma::mat& C) {
+  int nbas = C.n_rows;
+  int ij;
+  arma::vec temp1(nbas);
+  arma::mat temp2(nbas,nbas);
+
+  for (int p = 0; p < nbas; p++){
+    for (int q = 0; q <= p; q++){
+      temp2.zeros();
+      for (int i = 0; i < nbas; i++){
+        for (int j = 0; j < nbas; j++){
+          ij = idx2(i,j);
+          for (int k = 0; k < nbas; k++){
+            for (int l = 0; l <= k; l++){
+              temp2(k,l) += C(i,p) * C(j,q) * ERI_in(idx2(ij,idx2(k,l)));
+            }
+          }
+        }
+      }
+      temp2=symmatl(temp2);
+      for (int r = 0; r <= p; r++){
+        temp1.zeros();
+        for (int k = 0; k < nbas; k++){
+          for (int l = 0; l < nbas; l++){
+            temp1(l) += C(k,r) * temp2(k,l);
+          }
+        }
+        for (int s = 0; s <=r && (!(p==r) || s <=q); s++){
+          ERI_out(idx4(p,q,r,s)) = dot(C.col(s), temp1);
+        }
+      }
+    }
+  }
+}
+
+void trans_ERI3(arma::vec& ERI_in, arma::vec& ERI_out, arma::mat& C) {
+  int nbas = C.n_rows;
+  int ij;
+  arma::mat temp2(nbas,nbas);
+
+  for (int p = 0; p < nbas; p++){
+    for (int q = 0; q <= p; q++){
+      temp2.zeros();
+      for (int i = 0; i < nbas; i++){
+        for (int j = 0; j < nbas; j++){
+          ij = idx2(i,j);
+          for (int k = 0; k < nbas; k++){
+            for (int l = 0; l <= k; l++){
+              temp2(k,l) += C(i,p) * C(j,q) * ERI_in(idx2(ij,idx2(k,l)));
+            }
+          }
+        }
+      }
+      temp2=symmatl(temp2);
+      for (int r = 0; r <= p; r++){
+        for (int s = 0; s <=r && (!(p==r) || s <=q); s++){
+          ERI_out(idx4(p,q,r,s)) = arma::trace(arma::kron(C.col(r),C.col(s).t()) * temp2);
+        }
+      }
+    }
+  }
 }
 
 double calc_mp2_energy(arma::vec& ERI_mo, arma::vec& e, size_t nocc, size_t nbas){
@@ -191,12 +183,8 @@ int main()
   size_t NElec = 10;
   size_t NOcc = NElec / 2;
   size_t NBasis = 7;
-  size_t M2 = idx4(NBasis-1, NBasis-1, NBasis-1, NBasis-1);
-  size_t M = idx4(NBasis, NBasis, NBasis, NBasis);
+  size_t M = idx4(NBasis-1, NBasis-1, NBasis-1, NBasis-1)+1;
   size_t Nnuc ;
-//  int Nnuc;
-//  long unsigned Nnuc;
-//  unsigned Nnuc;
   size_t i, j, k, l;
   double val, qi, xi, yi, zi;
   size_t mu, nu, lam, sig;
@@ -277,16 +265,16 @@ int main()
 
   arma::vec ERI = arma::vec(M, arma::fill::zeros);
   arma::vec ERI_mo = arma::vec(M, arma::fill::zeros);
-  arma::vec ERI_mo2 = arma::vec(M, arma::fill::zeros);
-  arma::vec ERI_mo3 = arma::vec(M, arma::fill::zeros);
 
   FILE *ERI_file;
   ERI_file = fopen("h2o_sto3g_eri.dat", "r");
-
+  printf("debug1\n");
   while (fscanf(ERI_file, "%d %d %d %d %lf", &i, &j, &k, &l, &val) != EOF) {
     mu = i-1; nu = j-1; lam = k-1; sig = l-1;
+    printf("%4d %4d %4d %4d %5d\n",mu,nu,lam,sig,idx4(mu,nu,lam,sig));
     ERI(idx4(mu,nu,lam,sig)) = val;
   }
+  printf("debug2\n");
 
   fclose(ERI_file);
 
@@ -346,7 +334,6 @@ int main()
     // why doesn't this work?
     // E_elec_new = calc_one_elec_prop((H + F), D_new);
     E_total = E_elec_new + Vnn;
-    //do stuff and test for convergence
     delta_E = fabs(E_elec_new-E_elec_old);
     rmsd_D = rmsd_density(D_new, D_old);
     printf("%6d %20.15f %20.15f %20.15f\n", iteration, E_elec_new, rmsd_D, delta_E);
@@ -375,57 +362,30 @@ int main()
   printf("E_F                    = %20.15f\n",E_F);
   printf("E_H                    = %20.15f\n",E_H);
   printf("E_J                    = %20.15f\n",E_J);
-  printf("E_K                    = %20.15f\n",E_K);
-  
+  printf("E_K                    = %20.15f\n\n",E_K);
+
+  trans_ERI3(ERI, ERI_mo, C);
+  double mp2_e = 0.0;
+  mp2_e = calc_mp2_energy(ERI_mo, eps_vec, NOcc, NBasis);
+  printf("MP2 Energy             = %20.15f\n", mp2_e);
+  printf("E_HF + E_MP2           = %20.15f\n\n", mp2_e + E_total);
+
   double mu_x, mu_y, mu_z;
 
   mu_x = calc_one_elec_prop(Mu_x_mat, D_new);
   mu_y = calc_one_elec_prop(Mu_y_mat, D_new);
   mu_z = calc_one_elec_prop(Mu_z_mat, D_new);
-  
+
   for (i = 0; i < Nnuc; i++) {
     mu_x += Geom(i,0) * Geom(i,1);
     mu_y += Geom(i,0) * Geom(i,2);
     mu_z += Geom(i,0) * Geom(i,3);
   }
-  printf("Mu_X =  %20.15f\n", mu_x);
-  printf("Mu_Y =  %20.15f\n", mu_y);
-  printf("Mu_Z =  %20.15f\n", mu_z);
+  printf("Mu_X                   = %20.15f\n", mu_x);
+  printf("Mu_Y                   = %20.15f\n", mu_y);
+  printf("Mu_Z                   = %20.15f\n\n", mu_z);
 
-  trans_ERI2(ERI, ERI_mo2, C);
-  trans_ERI3(ERI, ERI_mo3, C);
-  trans_ERI(ERI, ERI_mo, C);
-  double mp2_e = 0.0;
-  mp2_e = calc_mp2_energy(ERI_mo, eps_vec, NOcc, NBasis);
-  printf("MP2 Energy =  %20.15f\n", mp2_e);
-  printf("M  = %d\n",M);
-  printf("M2 = %d\n",M2);
-  for (int ii = 0; ii <= M2; ii++){
-    printf("%5d %20.15f %20.15f %20.15f\n",ii,ERI_mo2(ii),ERI_mo(ii)-ERI_mo2(ii),ERI_mo3(ii)-ERI_mo2(ii));
-  }
-  /*
-  int i, j, k, l, ij, kl, ijkl;
-  int NBasis = 2;
-  int mmax = idx4(NBasis,NBasis,NBasis,NBasis); 
-  for (int ijkl= 0; ijkl < mmax+1; ijkl++) {
-    idx2inv(ijkl,ij,kl);
-    idx2inv(ij,i,j);
-    idx2inv(kl,k,l);
 
-    printf("%4d %4d %4d %4d %4d %4d %4d\n",ijkl,ij,kl,i,j,k,l);
-  }
-
-  for (i = 0; i < NBasis+1; i++){
-    eri1=
-    for (j = 0; j <= i; j++){
-      for (k = 0; k <= i; k++){
-        for (l = 0; l <=k && (!(i==k) || l <=j); l++){
-          printf("%4d %4d %4d %4d %4d %4d %4d\n",idx4(i,j,k,l),idx2(i,j),idx2(k,l),i,j,k,l);
-        }
-      }
-    }
-  }
- */
   return 0;
 
 }
