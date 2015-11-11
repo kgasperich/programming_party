@@ -24,6 +24,7 @@ void print_arma_vec(const arma::vec& vec, int ncols);
 int compound_index_2(int i, int j);
 int compound_index_4(int i, int j, int k, int l);
 int idx2(int i, int j);
+void idx2inv(int ij, int & i, int & j);
 int idx4(int i, int j, int k, int l);
 
 #endif /* UTILS_HPP */

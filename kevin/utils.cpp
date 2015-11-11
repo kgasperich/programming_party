@@ -76,8 +76,15 @@ int idx2(int i, int j) {
     return j*(j+1)/2 + i;
 }
 
+void idx2inv(int ij, int & i, int & j) {
+  i = floor(sqrt(2*ij+0.25) - 0.5);
+  j = ij - i*(i+1)/2;
+}
+
 int idx4(int i, int j, int k, int l) {
   int ij = idx2(i,j);
   int kl = idx2(k,l);
   return idx2(ij,kl);
 }
+
+
